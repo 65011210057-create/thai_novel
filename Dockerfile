@@ -21,8 +21,6 @@ COPY . /var/www/html/
 
 # 5. ติดตั้ง dependencies ของ Python (รวมถึง sentence-transformers และ torch)
 RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
-RUN ln -s /var/www/html/Image /var/www/html/image 2>/dev/null || true
-RUN chmod -R 755 /var/www/html/Image
 # 6. เปิดพอร์ต 80 และรัน Apache
 EXPOSE 80
 CMD ["apache2-foreground"]
