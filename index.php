@@ -1051,12 +1051,13 @@ body {
 
   <!-- Main Header & Search -->
   <div class="header-area">
-    <a href="index.php" class="brand-logo">
-      <div class="brand-icon-box">
-        <i class="fi fi-rr-book-bookmark"></i>
-      </div>
-      <span class="brand-text">THAI Novel Book</span>
-    </a>
+    <!-- โค้ดใหม่ที่แก้แล้ว -->
+<a href="admin_login.php" class="brand-logo" title="เข้าสู่ระบบผู้ดูแล">
+  <div class="brand-icon-box">
+    <i class="fi fi-rr-book-bookmark"></i>
+  </div>
+  <span class="brand-text">THAI Novel Book</span>
+</a>
 
     <div class="search-wrapper">
       <form class="search-box" method="GET" action="index.php">
