@@ -1,7 +1,31 @@
 <?php
 session_start();
-include "db.php";
 
+// =====================================
+// การเชื่อมต่อฐานข้อมูล TiDB Cloud / Local
+// =====================================
+$db_host = getenv("DB_HOST") ?: "gateway01.ap-southeast-1.prod.aws.tidbcloud.com";
+$db_user = getenv("DB_USER") ?: "4JodNqEkbc1nEbH.root";
+$db_pass = getenv("DB_PASS") ?: "zF4DHIXiUrHylslj";
+$db_name = getenv("DB_NAME") ?: "thai_novel";
+$db_port = getenv("DB_PORT") ?: 4000;
+
+$conn = mysqli_init();
+
+if ($db_host !== "localhost" && $db_host !== "127.0.0.1") {
+    $ca_cert = "/etc/ssl/certs/ca-certificates.crt";
+    if (file_exists($ca_cert)) {
+        mysqli_ssl_set($conn, NULL, NULL, $ca_cert, NULL, NULL);
+    }
+}
+
+if (!@mysqli_real_connect($conn, $db_host, $db_user, $db_pass, $db_name, (int)$db_port, NULL, MYSQLI_CLIENT_SSL)) {
+    die("เชื่อมต่อฐานข้อมูลล้มเหลว: " . mysqli_connect_error());
+}
+
+mysqli_set_charset($conn, "utf8mb4");
+
+// ถ้าล็อกอินอยู่แล้วให้ไปหน้า admin_books.php ทันที
 if(isset($_SESSION['admin_logged_in'])){
     header("Location: admin_books.php");
     exit;
@@ -38,7 +62,7 @@ if(isset($_POST['login'])){
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>เข้าสู่ระบบผู้ดูแลระบบ — THAI Novel Book</title>
 
-<!-- Google Fonts เดียวกันกับ index.php -->
+<!-- Google Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -77,7 +101,44 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* การ์ดกล่องล็อกอินสไตล์ Glassmorphism */
+/* ปุ่มย้อนกลับหน้าแรก */
+.nav-back-home {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1.5px solid rgba(255, 255, 255, 0.95);
+  border-radius: 50px;
+  padding: 8px 18px;
+  text-decoration: none;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(150, 135, 185, 0.16);
+  transition: all 0.25s ease;
+}
+
+.nav-back-home i {
+  color: #ff758c;
+  font-size: 13px;
+  transition: transform 0.2s ease;
+}
+
+.nav-back-home:hover {
+  transform: translateY(-2px);
+  background: #ffffff;
+  color: #ff758c;
+  box-shadow: 0 8px 20px rgba(255, 117, 140, 0.25);
+}
+
+.nav-back-home:hover i {
+  transform: translateX(-3px);
+}
+
+/* กล่องการ์ดล็อกอิน */
 .login-card {
   background: var(--glass-bg);
   backdrop-filter: blur(32px);
@@ -100,6 +161,12 @@ body {
   justify-content: center;
   gap: 12px;
   margin-bottom: 28px;
+  text-decoration: none;
+  transition: transform 0.2s ease;
+}
+
+.brand-title-wrap:hover {
+  transform: translateY(-2px);
 }
 
 .brand-icon-box {
@@ -214,17 +281,32 @@ label i {
   transform: translateY(-2px);
   box-shadow: 0 8px 22px rgba(48, 43, 99, 0.4);
 }
+
+@media (max-width: 580px) {
+  .nav-back-home {
+    position: static;
+    margin-bottom: 16px;
+    align-self: flex-start;
+  }
+}
 </style>
 </head>
 <body>
 
+<!-- ปุ่มลัดกลับหน้าหลัก -->
+<a href="index.php" class="nav-back-home">
+  <i class="fi fi-rr-arrow-left"></i>
+  <span>กลับหน้าหลัก</span>
+</a>
+
 <div class="login-card">
-  <div class="brand-title-wrap">
+  <!-- คลิกโลโก้เพื่อกลับหน้าหลัก -->
+  <a href="index.php" class="brand-title-wrap" title="กลับสู่หน้าหลัก">
     <div class="brand-icon-box">
       <i class="fi fi-rr-book-bookmark"></i>
     </div>
     <div class="brand-text">THAI Novel Book</div>
-  </div>
+  </a>
 
   <?php if($error): ?>
     <div class="alert-error">
