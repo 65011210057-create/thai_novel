@@ -97,22 +97,37 @@ if(isset($_POST['submit'])){
     $affected_categories = [];
 
     // บันทึกเฉพาะเล่มที่ไม่ซ้ำเข้าฐานข้อมูล
-    foreach($valid_entries as$entry){
-        $t =$entry['title'];
-        $a =$entry['author'];
-        $p =$entry['publisher'];
-        $b =$entry['blurb'];
-        $img =$entry['image'];
-        $cat_id =$entry['cat_id'];
+    // หาค่า id สูงสุดเดิมของทั้ง 2 ตารางเตรียมไว้เพื่อรัน id ต่อเนื่อง
+    $res_ab = mysqli_query($conn, "SELECT COALESCE(MAX(add_book_id), 0) AS max_id FROM add_book");
+    $row_ab = mysqli_fetch_assoc($res_ab);
+    $next_add_book_id = intval($row_ab['max_id']);
 
+    $res_b = mysqli_query($conn, "SELECT COALESCE(MAX(Book_id), 0) AS max_id FROM book");
+    $row_b = mysqli_fetch_assoc($res_b);
+    $next_book_id = intval($row_b['max_id']);
+
+    // บันทึกเฉพาะเล่มที่ไม่ซ้ำเข้าฐานข้อมูล
+    foreach($valid_entries as $entry){
+        $t = $entry['title'];
+        $a = $entry['author'];
+        $p = $entry['publisher'];
+        $b = $entry['blurb'];
+        $img = $entry['image'];
+        $cat_id = $entry['cat_id'];
+
+        $next_add_book_id++;
+        $next_book_id++;
+
+        // ใส่ add_book_id เข้าไปด้วยเพื่อไม่ให้ติด Error default value
         mysqli_query($conn, "
-            INSERT INTO add_book (Title, Author, Publisher, Blurb, image, Category_id)
-            VALUES ('$t', '$a', '$p', '$b', '$img', '$cat_id')
+            INSERT INTO add_book (add_book_id, Title, Author, Publisher, Blurb, image, Category_id)
+            VALUES ($next_add_book_id, '$t', '$a', '$p', '$b', '$img', '$cat_id')
         ");
 
+        // ใส่ Book_id เข้าไปด้วยเพื่อความสมบูรณ์
         mysqli_query($conn, "
-            INSERT INTO book (Title, Author, Publisher, Blurb, image, Category_id)
-            VALUES ('$t', '$a', '$p', '$b', '$img', '$cat_id')
+            INSERT INTO book (Book_id, Title, Author, Publisher, Blurb, image, Category_id)
+            VALUES ($next_book_id, '$t', '$a', '$p', '$b', '$img', '$cat_id')
         ");
 
         $inserted_count++;
