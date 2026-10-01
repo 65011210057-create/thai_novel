@@ -1,147 +1,26 @@
-import os
-import sys
-import pymysql
-import pandas as pd
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
+<?php
+// รับค่า id หมวดหมู่ เช่น sentence_same_category.php?id=111
+$category_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
-# =====================================
-# รับค่า Category_id จากพารามิเตอร์ภายนอก
-# =====================================
-if len(sys.argv) < 2:
-    print("Error: ไม่พบ Category_id กรุณาระบุ เช่น python sentence_same_category.py 1")
-    sys.exit(1)
+if ($category_id <= 0) {
+    die("กรุณาระบุ Category ID ที่ถูกต้อง เช่น sentence_same_category.php?id=1");
+}
 
-try:
-    target_category_id = int(sys.argv[1])
-except ValueError:
-    print("Error: Category_id ต้องเป็นตัวเลขจำนวนเต็มเท่านั้น")
-    sys.exit(1)
+// กำหนดคำสั่งรัน Python
+$command = escapeshellcmd("python3 sentence_same_category.py " . $category_id);
 
-print(f"กำลังเริ่มคำนวณ Recommendation เฉพาะ Category_id: {target_category_id}")
+// รันคำสั่งและดึงผลลัพธ์ log ออกมาแสดง
+$output = shell_exec($command . " 2>&1");
 
-# =====================================
-# Database Configuration จาก Environment Variables
-# =====================================
-db_host = os.getenv("DB_HOST", "localhost")
-db_user = os.getenv("DB_USER", "root")
-db_pass = os.getenv("DB_PASS", "")
-db_name = os.getenv("DB_NAME", "thai_novel")
-db_port = int(os.getenv("DB_PORT", 3306))
-
-try:
-    conn = pymysql.connect(
-        host=db_host,
-        user=db_user,
-        password=db_pass,
-        database=db_name,
-        port=db_port,
-        charset="utf8"
-    )
-except Exception as e:
-    print(f"Error เชื่อมต่อฐานข้อมูลล้มเหลว: {e}")
-    sys.exit(1)
-
-# =====================================
-# ดึงเฉพาะหนังสือในหมวดหมู่ที่ระบุ
-# =====================================
-sql = """
-SELECT
-    Book_id,
-    Title,
-    Blurb,
-    Category_id
-FROM book
-WHERE Category_id = %s
-ORDER BY Book_id
-"""
-
-df = pd.read_sql(sql, conn, params=(target_category_id,))
-
-if df.empty or len(df) <= 1:
-    print(f"หนังสือในหมวดหมู่ {target_category_id} มีไม่เพียงพอต่อการคำนวณ (มี {len(df)} เล่ม)")
-    conn.close()
-    sys.exit(0)
-
-print(f"พบหนังสือในหมวดนี้ทั้งหมด: {len(df)} เล่ม")
-
-# =====================================
-# โหลด Sentence Transformer
-# =====================================
-print("Loading Embedding model...")
-model = SentenceTransformer(
-    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-)
-print("Embedding model loaded")
-
-# =====================================
-# ลบข้อมูลเดิมเฉพาะหนังสือในหมวดนี้
-# =====================================
-cursor = conn.cursor()
-
-cursor.execute("""
-    DELETE FROM recommendation_sentence_same_category
-    WHERE book_id IN (SELECT Book_id FROM book WHERE Category_id = %s)
-""", (target_category_id,))
-
-# =====================================
-# รวมข้อความ Title + Blurb
-# =====================================
-df["content"] = (
-    df["Title"].fillna("").astype(str)
-    + " "
-    + df["Blurb"].fillna("").astype(str)
-)
-
-# =====================================
-# สร้าง Embedding & Cosine Similarity
-# =====================================
-print("Creating Embedding vectors...")
-vectors = model.encode(
-    df["content"].tolist(),
-    show_progress_bar=False
-)
-
-similarity_matrix = cosine_similarity(vectors)
-book_ids = df["Book_id"].tolist()
-
-total_saved = 0
-
-# =====================================
-# คำนวณและบันทึก Top 5 ให้หนังสือแต่ละเล่มในหมวดนี้
-# =====================================
-for i, book_id in enumerate(book_ids):
-    scores = similarity_matrix[i]
-    result = []
-
-    for j, score in enumerate(scores):
-        if book_ids[j] != book_id:
-            result.append((int(book_ids[j]), float(score)))
-
-    result.sort(key=lambda x: x[1], reverse=True)
-    top_books = result[:5]
-
-    for recommend_id, score in top_books:
-        cursor.execute("""
-            INSERT INTO recommendation_sentence_same_category
-            (
-                book_id,
-                recommend_book_id,
-                similarity
-            )
-            VALUES (%s, %s, %s)
-        """, (
-            int(book_id),
-            int(recommend_id),
-            round(score, 4)
-        ))
-        total_saved += 1
-
-# =====================================
-# Commit และปิดการเชื่อมต่อ
-# =====================================
-conn.commit()
-cursor.close()
-conn.close()
-
-print(f"\nคำนวณหมวด {target_category_id} เสร็จสมบูรณ์ บันทึกทั้งหมด {total_saved} รายการ")
+echo "<!DOCTYPE html>";
+echo "<html lang='th'>";
+echo "<head><meta charset='UTF-8'><title>ประมวลผล Recommendation</title></head>";
+echo "<body style='font-family: Arial, sans-serif; padding: 20px; background: #fdfaf7;'>";
+echo "<h2>ผลการคำนวณ Recommendation (หมวดหมู่ ID: " . htmlspecialchars($category_id) . ")</h2>";
+echo "<pre style='background: #2d3748; color: #f7fafc; padding: 15px; border-radius: 8px; font-size: 14px; overflow-x: auto;'>";
+echo htmlspecialchars($output ?: "ไม่พบผลลัพธ์จากระบบ (อาจกำลังประมวลผลอยู่เบื้องหลัง)");
+echo "</pre>";
+echo "<br><a href='index.php' style='text-decoration: none; background: #4a5568; color: white; padding: 8px 16px; border-radius: 5px;'>กลับสู่หน้าหลัก</a>";
+echo "</body>";
+echo "</html>";
+?>
