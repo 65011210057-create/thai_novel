@@ -1,15 +1,20 @@
 import os
 import pymysql
 import pandas as pd
+import torch
 from fastapi import FastAPI, BackgroundTasks
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
+# จำกัดการใช้ Thread เพื่อไม่ให้ใช้ CPU/RAM เกินโควตา
+torch.set_num_threads(1)
+
 app = FastAPI(title="Recommendation Service")
 
-# ดึงโมเดลมาเก็บไว้ในหน่วยความจำ
+# ใช้โมเดลขนาดเล็กพิเศษ (กิน RAM เพียง ~150-200MB)
 print("กำลังโหลดโมเดล Sentence Transformers...")
-model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+model = SentenceTransformer("all-MiniLM-L6-v2")
+model.eval()
 print("โหลดโมเดลสำเร็จ พร้อมใช้งาน!")
 
 # ค่าเชื่อมต่อ TiDB Cloud
@@ -46,7 +51,10 @@ def run_calculation(category_id: int):
         current_id = row[0] if row else 0
         
         df["content"] = df["Title"].fillna("").astype(str) + " " + df["Blurb"].fillna("").astype(str)
-        vectors = model.encode(df["content"].tolist(), show_progress_bar=False)
+        
+        with torch.no_grad():
+            vectors = model.encode(df["content"].tolist(), show_progress_bar=False, batch_size=8)
+            
         similarity_matrix = cosine_similarity(vectors)
         book_ids = df["Book_id"].tolist()
         
