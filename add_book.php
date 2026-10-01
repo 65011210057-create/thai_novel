@@ -119,11 +119,13 @@ if(isset($_POST['submit'])){
         $affected_categories[$cat_id] = true;
     }
 
-    // คำนวณ recommendation ผ่าน Python สำหรับหมวดที่ได้รับผลกระทบ
-    $python = 'python3';$script = __DIR__ . '/sentence_same_category.py';
-
-    foreach(array_keys($affected_categories) as$cid){
-        exec(escapeshellcmd($python) . ' ' . escapeshellarg($script) . ' ' . intval($cid) . ' 2>&1');
+    // ส่งคำขอไปให้ AI API บน Render ประมวลผลเบื้องหลัง
+    foreach(array_keys($affected_categories) as $cid){
+        $api_url = "https://thai-novel-ai-api.onrender.com/calculate?category_id=" . intval($cid);
+        $ctx = stream_context_create([
+            'http' => ['timeout' => 1, 'ignore_errors' => true]
+        ]);
+        @file_get_contents($api_url, false, $ctx);
     }
 
     // ข้อความแจ้งเตือนสรุปผล

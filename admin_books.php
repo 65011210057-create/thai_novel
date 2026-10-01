@@ -133,9 +133,12 @@ if(isset($_GET['delete_id'])){
         mysqli_query($conn, "DELETE FROM add_book WHERE Title='$del_title' AND Author='$del_author'");
         mysqli_query($conn, "DELETE FROM recommendation_sentence_same_category WHERE book_id=$del_id OR recommend_book_id=$del_id");
 
-        if($target_cat){
-            exec(escapeshellcmd($python) . ' ' . escapeshellarg($script) . ' ' . intval($target_cat) . ' 2>&1');
-        }
+        // ใหม่
+if($target_cat){
+    $api_url = "https://thai-novel-ai-api.onrender.com/calculate?category_id=" . intval($target_cat);
+    $ctx = stream_context_create(['http' => ['timeout' => 1, 'ignore_errors' => true]]);
+    @file_get_contents($api_url, false, $ctx);
+}
     }
     header("Location: admin_books.php");
     exit;
@@ -178,11 +181,13 @@ if(isset($_POST['update_book'])){
         WHERE Book_id=$edit_id
     ");
 
-    if($needs_recalculate){
-        exec(escapeshellcmd($python) . ' ' . escapeshellarg($script) . ' ' . intval($category_id) . ' 2>&1');
-        if($old_cat !== $category_id){
-            exec(escapeshellcmd($python) . ' ' . escapeshellarg($script) . ' ' . intval($old_cat) . ' 2>&1');
-        }
+   // ใหม่
+if($needs_recalculate){
+    $ctx = stream_context_create(['http' => ['timeout' => 1, 'ignore_errors' => true]]);
+    @file_get_contents("https://thai-novel-ai-api.onrender.com/calculate?category_id=" . intval($category_id), false, $ctx);
+    if($old_cat !== $category_id){
+        @file_get_contents("https://thai-novel-ai-api.onrender.com/calculate?category_id=" . intval($old_cat), false, $ctx);
+    }
         echo "<script>alert('✅ บันทึกการแก้ไขสำเร็จ '); window.location='admin_books.php';</script>";
     } else {
         echo "<script>alert('✅ บันทึกการแก้ไขสำเร็จ '); window.location='admin_books.php';</script>";
