@@ -1,21 +1,11 @@
 import os
 import pymysql
 import pandas as pd
-import torch
 from fastapi import FastAPI, BackgroundTasks
-from sentence_transformers import SentenceTransformer
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-# จำกัดการใช้ Thread เพื่อไม่ให้ใช้ CPU/RAM เกินโควตา
-torch.set_num_threads(1)
-
 app = FastAPI(title="Recommendation Service")
-
-# ใช้โมเดลขนาดเล็กพิเศษ (กิน RAM เพียง ~150-200MB)
-print("กำลังโหลดโมเดล Sentence Transformers...")
-model = SentenceTransformer("all-MiniLM-L6-v2")
-model.eval()
-print("โหลดโมเดลสำเร็จ พร้อมใช้งาน!")
 
 # ค่าเชื่อมต่อ TiDB Cloud
 DB_HOST = os.getenv("DB_HOST", "gateway01.ap-southeast-1.prod.aws.tidbcloud.com")
@@ -50,12 +40,13 @@ def run_calculation(category_id: int):
         row = cursor.fetchone()
         current_id = row[0] if row else 0
         
+        # รวม Title และ Blurb เพื่อวิเคราะห์เนื้อหา
         df["content"] = df["Title"].fillna("").astype(str) + " " + df["Blurb"].fillna("").astype(str)
         
-        with torch.no_grad():
-            vectors = model.encode(df["content"].tolist(), show_progress_bar=False, batch_size=8)
-            
-        similarity_matrix = cosine_similarity(vectors)
+        # คำนวณด้วย TF-IDF (ประหยัด RAM สูงมาก และเร็วระดับมิลลิวินาที)
+        vectorizer = TfidfVectorizer()
+        tfidf_matrix = vectorizer.fit_transform(df["content"].tolist())
+        similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
         book_ids = df["Book_id"].tolist()
         
         for i, book_id in enumerate(book_ids):
@@ -73,13 +64,13 @@ def run_calculation(category_id: int):
         conn.commit()
         cursor.close()
         conn.close()
-        print(f"✅ บันทึกผลแนะนำหมวดหมู่ {category_id} สำเร็จ")
+        print(f"✅ คำนวณและบันทึกผลหมวดหมู่ {category_id} สำเร็จ")
     except Exception as e:
         print(f"❌ Error: {e}")
 
 @app.get("/")
 def home():
-    return {"status": "AI Service Running"}
+    return {"status": "Recommendation API is Running"}
 
 @app.get("/calculate")
 def trigger_calculate(category_id: int, background_tasks: BackgroundTasks):
