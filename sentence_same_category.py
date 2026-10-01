@@ -1,3 +1,4 @@
+import os
 import sys
 import pymysql
 import pandas as pd
@@ -11,19 +12,47 @@ if len(sys.argv) < 2:
     print("Error: ไม่พบ Category_id กรุณาระบุ เช่น python sentence_same_category.py 1")
     sys.exit(1)
 
-target_category_id = int(sys.argv[1])
+try:
+    target_category_id = int(sys.argv[1])
+except ValueError:
+    print("Error: Category_id ต้องเป็นตัวเลขจำนวนเต็มเท่านั้น")
+    sys.exit(1)
+
 print(f"กำลังเริ่มคำนวณ Recommendation เฉพาะ Category_id: {target_category_id}")
 
 # =====================================
-# Database
+# Database Configuration จาก Environment Variables
 # =====================================
-conn = pymysql.connect(
-    host="localhost",
-    user="root",
-    password="",
-    database="thai_novel",
-    charset="utf8"
-)
+db_host = os.getenv("DB_HOST", "localhost")
+db_user = os.getenv("DB_USER", "root")
+db_pass = os.getenv("DB_PASS", "")
+db_name = os.getenv("DB_NAME", "thai_novel")
+db_port = int(os.getenv("DB_PORT", 3306))
+
+# ตรวจสอบการตั้งค่า SSL (สำหรับ TiDB Cloud บน Render)
+connect_kwargs = {
+    "host": db_host,
+    "user": db_user,
+    "password": db_pass,
+    "database": db_name,
+    "port": db_port,
+    "charset": "utf8mb4"
+}
+
+# หากไม่ใช่ localhost (อยู่บน Render/TiDB Cloud) ให้เปิดใช้งาน SSL
+if db_host != "localhost" and db_host != "127.0.0.1":
+    ca_path = "/etc/ssl/certs/ca-certificates.crt"
+    if os.path.exists(ca_path):
+        connect_kwargs["ssl"] = {"ca": ca_path}
+    else:
+        connect_kwargs["ssl"] = {}
+
+try:
+    conn = pymysql.connect(**connect_kwargs)
+    print("เชื่อมต่อฐานข้อมูลสำเร็จ")
+except Exception as e:
+    print(f"Error เชื่อมต่อฐานข้อมูลล้มเหลว: {e}")
+    sys.exit(1)
 
 # =====================================
 # ดึงเฉพาะหนังสือในหมวดหมู่ที่ระบุ
@@ -98,14 +127,10 @@ for i, book_id in enumerate(book_ids):
     result = []
 
     for j, score in enumerate(scores):
-        # ไม่แนะนำตัวเอง
         if book_ids[j] != book_id:
             result.append((int(book_ids[j]), float(score)))
 
-    # เรียงคะแนนจากสูงไปต่ำ
     result.sort(key=lambda x: x[1], reverse=True)
-
-    # เลือก Top 5
     top_books = result[:5]
 
     for recommend_id, score in top_books:
